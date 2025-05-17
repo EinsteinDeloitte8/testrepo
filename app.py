@@ -1,144 +1,81 @@
-from main import rag_chatbot
-import gradio as gr
-import time
-import os
+import streamlit as st
 
-from src.ingestion.ingest_files import ingest_files_data_folder
-from src.services.models.embeddings import Embeddings
-from src.services.models.llm import LLM
-from src.services.vectorial_db.faiss_index import FAISSIndex
+# --- ESTILO DA SIDEBAR ---
+st.markdown("""
+    <style>
+    [data-testid="stSidebar"] {
+        background-color: #0D4920;
+        color: white;
+    }
+    [data-testid="stSidebar"] * {
+        color: white !important;
+    }
+    div[data-testid="stRadio"] {
+        margin-bottom: 0.25rem !important;
+    }
+    div[data-testid="stRadio"] > label {
+        padding-top: 2px !important;
+        padding-bottom: 2px !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-# Initialize instances for the LLM, embeddings, and FAISS index
-llm = LLM()
-embeddings = Embeddings()
-index = FAISSIndex(embeddings=embeddings.get_embeddings)
+# --- SIDEBAR ---
+st.sidebar.title("EcoGuide ChatBot")
 
-# Load the FAISS index, ingest data if it doesn't exist
-try:
-    index.load_index()
-except FileNotFoundError:
-    ingest_files_data_folder(index)
-    index.save_index()
+# Opções: Chat + FAQs
+options = ["Chat"] + [
+    "What are the greenhouse gases?",
+    "How are indigenous people being affected by climate change?",
+    "What should be the percent reduction in global passenger car fleet emissions by 2025?",
+    "What are emission factors, and how are they determined?",
+    "What is the main problematic greenhouse gas and what are its causes?"
+]
+selected_option = st.sidebar.radio("Escolha uma opção:", options)
 
-
-def chatbot_wrapper(input_text, history):
-    """
-    Wrapper function for the chatbot, handling Gradio integration.
-
-    Args:
-        input_text (str): User input text.
-        history (list): Conversation history.
-
-    Returns:
-        tuple: Updated conversation history and a placeholder string.
-    """
-    if history is None:
-        history = []
-
-    _, updated_history = rag_chatbot(llm, input_text, history[:-1], index) # Call the main chatbot function with previous history.
-
-    return updated_history, ""  # Return updated history and empty string.
-
-
-def add_user_text(history, txt):
-    """
-    Adds user text to the conversation history.
-
-    Args:
-        history (list): Conversation history.
-        txt (str): User input text.
-
-    Returns:
-        tuple: Updated conversation history and user input text.
-    """
-    if history is None:
-        history = []
-    history = history + [{"role": "user", "content": txt}]
-    return history, txt
-
-
-def update_temperature(temperature):
-    """Placeholder function for updating temperature."""
-    # Not Implemented
-    return temperature
-
-
-def update_max_tokens(max_tokens):
-    """Placeholder function for updating max tokens."""
-    # Not Implemented
-    return max_tokens
-
-
-def add_file(history, file_obj):
-    try:
-        # Read file content
-        content = file_obj.read()
-        
-        # If the content is in bytes, decode it to a string
-        if isinstance(content, bytes):
-            content = content.decode('utf-8', errors='replace')
-        
-        # Append the file name and content to history
-        history.append({
-            'filename': file_obj.name,
-            'content': content
-        })
-    except Exception as e:
-        history.append({
-            'filename': getattr(file_obj, 'name', 'unknown'),
-            'error': str(e)
-        })
-    
-    return history
-
-
-def process(history):
-    """Placeholder function for processing input."""
-    return history
-
-
-# Custom CSS for styling the chatbot
-custom_css = """
-#chatbot {
-    height: 70vh !important;
+# --- RESPOSTAS FIXAS ---
+responses = {
+    "What are the greenhouse gases?": "Greenhouse gases include CO₂, CH₄, N₂O, and fluorinated gases. They trap heat in the atmosphere.",
+    "How are indigenous people being affected by climate change?": "Indigenous communities face loss of land, biodiversity, and cultural heritage due to rising temperatures and extreme events.",
+    "What should be the percent reduction in global passenger car fleet emissions by 2025?": "A 45% reduction from 2020 levels is recommended to align with climate goals.",
+    "What are emission factors, and how are they determined?": "Emission factors represent the average emission rate of a pollutant for a specific source, determined through empirical studies and lab testing.",
+    "What is the main problematic greenhouse gas and what are its causes?": "CO₂ is the most impactful greenhouse gas, mainly from burning fossil fuels for energy and transport."
 }
-"""
 
-# Create the Gradio interface
-with gr.Blocks(css=custom_css) as demo:
-    # Chatbot UI element
-    chatbot_ui = gr.Chatbot(
-        [],
-        type="messages",
-        elem_id="chatbot",
-        bubble_full_width=True,
-        height=800,
-        avatar_images=((r"img/user.png"), (r"img/gpt.png")),
-    )
+# --- MAIN UI HEADER ---
+st.markdown("## EcoGuide ChatBot")
+st.caption("Respostas rápidas sobre clima e sustentabilidade")
 
-    with gr.Row():
-        # Text input box
-        txt = gr.Textbox(
-            scale=4,
-            show_label=False,
-            placeholder="Enter text and press enter, or upload an image",
-            container=False,
-        )
+# Inicializa histórico
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-    with gr.Row():
-        # Sliders for temperature and max tokens
-        temperature = gr.Slider(0.0, 2, value=1, label="Temperature")
-        max_tokens = gr.Slider(1, 1000, value=800, label="Max Tokens")
+# --- MODO FAQ ---
+# --- CHAT MODE ONLY ---
+if selected_option == "Chat":
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
-    # Register slider values (currently placeholder functions)
-    t = temperature.release(update_temperature, inputs=[temperature])
-    mt = max_tokens.release(update_max_tokens, inputs=[max_tokens])
+    # ✅ Show file uploader BEFORE first message in Chat
+    if "has_sent_message" not in st.session_state:
+        st.markdown("### Upload Documents")
+        uploaded_file = st.file_uploader("Select a file", type=["txt", "pdf", "docx"])
+        if uploaded_file is not None:
+            st.success(f"File uploaded successfully: **{uploaded_file.name}**")
 
-    # Define the event chain: submit text -> add to history -> call chatbot_wrapper -> clear textbox
-    txt_msg = txt.submit(add_user_text, [chatbot_ui, txt], [chatbot_ui, txt]).then(
-        chatbot_wrapper, [txt, chatbot_ui], [chatbot_ui, txt], queue=False
-    ).then(lambda: gr.Textbox(interactive=True), None, [txt], queue=False)
+    # Input box
+    user_input = st.chat_input("Type your message...")
 
+    if user_input and "last_user_input" not in st.session_state:
+        st.session_state.last_user_input = user_input
+        st.session_state.has_sent_message = True  # ✅ mark as sent
 
-# Launch the Gradio interface
-demo.launch()
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        with st.chat_message("user"):
+            st.markdown(user_input)
+
+        bot_reply = f"(simulated) You said: {user_input}"
+        st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+        with st.chat_message("assistant"):
+            st.markdown(bot_reply)
