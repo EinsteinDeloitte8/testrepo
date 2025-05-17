@@ -11,6 +11,7 @@ class Embeddings:
     Methods:
         get_embeddings(text): Generates embeddings for the given text using the Azure OpenAI Embeddings API.
     """
+    '''
     def __init__(self):
         """Initializes the Embeddings class with Azure OpenAI client and model information."""
         azure_endpoint = os.getenv("AZURE_EMBEDDINGS_ENDPOINT")
@@ -26,8 +27,10 @@ class Embeddings:
             api_version=api_version,
             api_key=api_key
         )
+'''
 
-    def get_embeddings(self, text: str) -> list[float]:
+
+    def get_embeddings(text: str) -> list[float]:
         """Generates embeddings for the given text.
 
         Args:
@@ -36,9 +39,23 @@ class Embeddings:
         Returns:
             list: A list of floats representing the text embedding.
         """
-        completion = self.client.embeddings.create(
+        """Initializes the Embeddings class with Azure OpenAI client and model information."""
+        azure_endpoint = os.getenv("AZURE_EMBEDDINGS_ENDPOINT")
+        azure_deployment = os.getenv("AZURE_EMBEDDINGS_DEPLOYMENT_NAME")
+        api_key = os.getenv("AZURE_EMBEDDINGS_API_KEY")
+        api_version = os.getenv("AZURE_LLM_API_VERSION")
+
+        model = os.getenv("AZURE_EMBEDDINGS_MODEL_NAME")
+
+        client = AzureOpenAI(
+            azure_endpoint=azure_endpoint,
+            azure_deployment=azure_deployment,
+            api_version=api_version,
+            api_key=api_key
+        )
+        completion = client.embeddings.create(
             input=text,
-            model=self.model
+            model=model
         )
         
         return completion.data[0].embedding

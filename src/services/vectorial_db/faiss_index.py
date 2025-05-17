@@ -3,9 +3,9 @@ import numpy as np
 import os
 import sys 
 
-from src.ingestion.chunking.token_chunking import TokenChunking
-from embeddings import Embeddings  # Assuming Embeddings class is in a file named embeddings.py
-from llm import LLM  # Assuming LLM class is in a file named llm.py
+from src.services.vectorial_db.token_chunking import TokenChunking
+from src.services.models.embeddings import Embeddings  # Assuming Embeddings class is in a file named embeddings.py
+from src.services.models.llm import LLM  # Assuming LLM class is in a file named llm.py
 
 
 class FAISSIndex:
@@ -29,7 +29,7 @@ class FAISSIndex:
         """Initialize the FAISSIndex with dimensions and embedding function."""
         if not embeddings:
             raise ValueError("No embeddings provided.")
-        self.embeddings = embeddings
+        self.embeddings = Embeddings
         self.dimension = dimension
         self.index: IndexFlatL2 | None = None
         self._create_faiss_index()
@@ -63,7 +63,8 @@ class FAISSIndex:
     def retrieve_chunks(self, query: str, num_chunks: int = 5) -> list:
         """Retrieve chunks from the FAISS index based on a query."""
         print(f"Retrieving chunks for query: '{query[:30]}...'")
-        query_embedding = self.embeddings.get_embeddings(query)
+        
+        query_embedding = self.embeddings.get_embeddings(text = query)
         query_vector = np.array([query_embedding]).astype('float32')
         
         print(f"Query embedding generated: {query_embedding[:5]}...")  # Print a part of the embedding for brevity

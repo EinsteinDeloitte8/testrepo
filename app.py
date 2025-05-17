@@ -1,6 +1,7 @@
 from main import rag_chatbot
 import gradio as gr
 import time
+import os
 
 from src.ingestion.ingest_files import ingest_files_data_folder
 from src.services.models.embeddings import Embeddings
@@ -69,7 +70,25 @@ def update_max_tokens(max_tokens):
 
 
 def add_file(history, file_obj):
-    """Placeholder function for handling file uploads."""
+    try:
+        # Read file content
+        content = file_obj.read()
+        
+        # If the content is in bytes, decode it to a string
+        if isinstance(content, bytes):
+            content = content.decode('utf-8', errors='replace')
+        
+        # Append the file name and content to history
+        history.append({
+            'filename': file_obj.name,
+            'content': content
+        })
+    except Exception as e:
+        history.append({
+            'filename': getattr(file_obj, 'name', 'unknown'),
+            'error': str(e)
+        })
+    
     return history
 
 
